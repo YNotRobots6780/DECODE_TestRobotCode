@@ -63,7 +63,14 @@ public class BasicTeleop6780 extends OpMode
     private DcMotor frontRightDrive = null;
     private DcMotor backRightDrive = null;
     private DcMotor backLeftDrive = null;
+    private DcMotor frontIntake = null;
+    private DcMotor middleIntake = null;
+    private DcMotor outtake = null;
 
+    private ElapsedTime outtakeFlywheelTimer = new ElapsedTime();
+
+    boolean isOuttakeOn = false;
+    boolean isOuttakePressed = false;
 
     /*
      * Code to run ONCE when the driver hits INIT
@@ -80,7 +87,9 @@ public class BasicTeleop6780 extends OpMode
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
         backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
-        
+        frontIntake = hardwareMap.get(DcMotor.class, "front_intake");
+        middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
+        outtake = hardwareMap.get(DcMotor.class, "outake");
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
@@ -104,6 +113,10 @@ public class BasicTeleop6780 extends OpMode
 
     }
 
+    @Override
+    public void start(){
+        outtakeFlywheelTimer.reset();
+    }
 
     @Override
     public void loop() {
@@ -128,6 +141,40 @@ public class BasicTeleop6780 extends OpMode
         backLeftDrive.setPower((y - x + rx) / denominator);
         frontRightDrive.setPower((y - x - rx) / denominator);
         backRightDrive.setPower((y + x - rx) / denominator);
+
+
+        if (gamepad1.left_bumper)   {
+            frontIntake.setPower(1);
+        }
+        else {
+            frontIntake.setPower(0);
+        }
+
+
+        if (gamepad1.right_trigger > 0.3){
+            if (isOuttakePressed == false) {
+                isOuttakeOn = !isOuttakeOn;
+                isOuttakePressed = true;
+                outtakeFlywheelTimer.reset();
+            }
+        }
+        else {
+            isOuttakePressed = false;
+        }
+
+
+        if (isOuttakeOn == true) {
+            outtake.setPower(.7);
+            if (outtakeFlywheelTimer.seconds() > 1) {
+                middleIntake.setPower(1);
+            }
+
+        }
+        else    {
+            outtake.setPower(0);
+            middleIntake.setPower(0);
+        }
+
     }
 
     /*
