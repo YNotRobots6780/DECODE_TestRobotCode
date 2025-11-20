@@ -34,6 +34,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -54,19 +55,21 @@ import com.qualcomm.robotcore.util.Range;
  */
 
 @TeleOp(name="BasicTeleop6780", group="Iterative OpMode")
-@Disabled
+
 public class BasicTeleop6780 extends OpMode
 {
     // Declare OpMode members.
     private IMU imu = null;
+    private boolean isFlywheelUpToSpeed = false;
     private DcMotor frontLeftDrive = null;
     private DcMotor frontRightDrive = null;
     private DcMotor backRightDrive = null;
     private DcMotor backLeftDrive = null;
     private DcMotor frontIntake = null;
     private DcMotor middleIntake = null;
-    private DcMotor outtake = null;
+    private DcMotorEx outake = null;
 
+    private DcMotorEx outake2 = null;
     private ElapsedTime outtakeFlywheelTimer = new ElapsedTime();
 
     boolean isOuttakeOn = false;
@@ -89,13 +92,24 @@ public class BasicTeleop6780 extends OpMode
         backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
         frontIntake = hardwareMap.get(DcMotor.class, "front_intake");
         middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
-        outtake = hardwareMap.get(DcMotor.class, "outake");
+
+        outake = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake");
+        outake2 = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake2");
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
         // Note: The settings here assume direct drive on left and right wheels.  Gear Reduction or 90 Deg drives may require direction flips
-        backRightDrive.setDirection(DcMotor.Direction.REVERSE);
-        frontLeftDrive.setDirection(DcMotor.Direction.REVERSE);
+
+        backLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+        outake.setDirection(DcMotorSimple.Direction.REVERSE);
+        middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
+        outake2.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+
+
+
+        outake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        outake2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         RevHubOrientationOnRobot revHubOrintation = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.DOWN, RevHubOrientationOnRobot.UsbFacingDirection.RIGHT);
         imu.initialize(new IMU.Parameters(revHubOrintation));
@@ -120,27 +134,31 @@ public class BasicTeleop6780 extends OpMode
 
     @Override
     public void loop() {
-        double heading = imu.getRobotYawPitchRollAngles().getYaw();
+        // double heading = imu.getRobotYawPitchRollAngles().getYaw();
 
-        double yInput= -gamepad1.left_stick_y; // Remember, Y stick is reversed!
-        double xInput = gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
+        double y = -gamepad1.left_stick_y; // Remember, Y stick is reversed!
+        double x = gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
         double rx = gamepad1.right_stick_x;
 
 
-        double x = (xInput * Math.sin(-heading)) - (yInput * Math.cos(-heading));
-        double y = (xInput * Math.cos(-heading)) + (yInput * Math.sin(-heading));
+        // double x = (xInput * Math.sin(-heading)) - (yInput * Math.cos(-heading));
+        // double y = (xInput * Math.cos(-heading)) + (yInput * Math.sin(-heading));
 
         // Denominator is the largest motor power (absolute value) or 1
         // This ensures all the powers maintain the same ratio, but only when
         // at least one is out of the range [-1, 1]
 
-        double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
+        double turnSpeedFactor = 0.65; // Adjust this value between 0 (no turn) and 1 (full turn)
+        double scaledRx = Math.signum(rx) * rx * rx; // smoother turning
+
+        double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(scaledRx), 1);
 
 
-        frontLeftDrive.setPower((y + x + rx) / denominator);
-        backLeftDrive.setPower((y - x + rx) / denominator);
-        frontRightDrive.setPower((y - x - rx) / denominator);
-        backRightDrive.setPower((y + x - rx) / denominator);
+        frontLeftDrive.setPower((y + x + scaledRx) / denominator * .9);
+        backLeftDrive.setPower((y - x + scaledRx) / denominator * .9);
+        frontRightDrive.setPower((y - x - scaledRx) / denominator *.9);
+        backRightDrive.setPower((y + x - scaledRx) / denominator * .9);
+
 
 
         if (gamepad1.left_bumper)   {
@@ -148,6 +166,11 @@ public class BasicTeleop6780 extends OpMode
         }
         else {
             frontIntake.setPower(0);
+        }
+
+
+        if (gamepad1.y) {
+            middleIntake.setPower(-1);
         }
 
 
@@ -163,18 +186,42 @@ public class BasicTeleop6780 extends OpMode
         }
 
 
+        telemetry.addData( "Outake velocity", outake.getVelocity());
+        telemetry.update();
         if (isOuttakeOn == true) {
-            outtake.setPower(.7);
-            if (outtakeFlywheelTimer.seconds() > 1) {
+            outake.setPower(.9);
+            outake2.setPower(.9);
+
+            if (outake.getVelocity() > .85) {
                 middleIntake.setPower(1);
             }
 
+            else {
+                middleIntake.setPower(0);
+            }
+
         }
-        else    {
-            outtake.setPower(0);
+        else   {
+
+            outake.setPower(0);
+            outake2.setPower(0);
             middleIntake.setPower(0);
         }
 
+        if (gamepad1.a){
+            frontIntake.setPower(1);
+            middleIntake.setPower(1);
+            outake.setPower(.9);
+            outake2.setPower(.9);
+        }
+
+
+        if (gamepad1.left_stick_button){
+            frontIntake.setPower(0);
+            middleIntake.setPower(0);
+            outake.setPower(0);
+            outake2.setPower(0);
+        }
     }
 
     /*
