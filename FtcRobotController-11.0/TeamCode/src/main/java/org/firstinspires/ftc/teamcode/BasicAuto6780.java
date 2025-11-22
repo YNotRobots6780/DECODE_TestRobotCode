@@ -30,7 +30,7 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -38,7 +38,6 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.util.ElapsedTime;
-import com.qualcomm.robotcore.util.Range;
 
 /*
  * This file contains an example of an iterative (Non-Linear) "OpMode".
@@ -54,9 +53,9 @@ import com.qualcomm.robotcore.util.Range;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@TeleOp(name="BasicTeleop6780", group="Iterative OpMode")
+@Autonomous(name="BasicAuto6780", group="Iterative OpMode")
 
-public class BasicTeleop6780 extends OpMode
+public class BasicAuto6780 extends OpMode
 {
     // Declare OpMode members.
     private IMU imu = null;
@@ -70,6 +69,8 @@ public class BasicTeleop6780 extends OpMode
     private DcMotorEx outake = null;
 
     private DcMotorEx outake2 = null;
+    private ElapsedTime autoTimer = new ElapsedTime();
+
 
 
     boolean isOuttakeOn = false;
@@ -129,110 +130,34 @@ public class BasicTeleop6780 extends OpMode
 
     @Override
     public void start() {
+        autoTimer.reset();
     }
 
     @Override
     public void loop() {
-        // double heading = imu.getRobotYawPitchRollAngles().getYaw();
-
-        double y = -gamepad1.left_stick_y; // Remember, Y stick is reversed!
-        double x = gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
-        double rx = gamepad1.right_stick_x;
-
-
-        // double x = (xInput * Math.sin(-heading)) - (yInput * Math.cos(-heading));
-        // double y = (xInput * Math.cos(-heading)) + (yInput * Math.sin(-heading));
-
-        // Denominator is the largest motor power (absolute value) or 1
-        // This ensures all the powers maintain the same ratio, but only when
-        // at least one is out of the range [-1, 1]
-
-        double turnSpeedFactor = 0.45; // Adjust this value between 0 (no turn) and 1 (full turn)
-        double scaledRx = Math.signum(rx) * rx * rx; // smoother turning
-
-        double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(scaledRx), 1);
-
-
-        frontLeftDrive.setPower((y + x + scaledRx) / denominator * .9);
-        backLeftDrive.setPower((y - x + scaledRx) / denominator * .9);
-        frontRightDrive.setPower((y - x - scaledRx) / denominator *.9);
-        backRightDrive.setPower((y + x - scaledRx) / denominator * .9);
-
-
-
-        if (gamepad1.left_bumper)   {
-            frontIntake.setPower(1);
+        if (autoTimer.seconds() < .49){
+            MoveRobot(0,-0.9,0);
         }
-        else {
-            frontIntake.setPower(0);
-        }
-
-
-        if (gamepad1.y) {
-            middleIntake.setPower(-1);
-        }
-
-
-        if (gamepad1.right_trigger > 0.3){
-            if (isOuttakePressed == false) {
-                isOuttakeOn = !isOuttakeOn;
-                isOuttakePressed = true;
-
-            }
-        }
-        else {
-            isOuttakePressed = false;
-        }
-
-
-        telemetry.addData( "Outake velocity", outake.getVelocity());
-        telemetry.update();
-        if (isOuttakeOn == true) {
-
-            if (outake.getVelocity() < -1750) {
-                outake.setPower(.8);
-                outake2.setPower(.8);
+        else if (autoTimer.seconds() < 2.7) {
+            MoveRobot(0,0,0);
+            if (IsFlywheelUpToSpeed() == true){
                 middleIntake.setPower(1);
             }
-            else if (outake.getVelocity() < -1900) {
-                outake.setPower(.6);
-                outake2.setPower(.6);
-            }
-            else {
-                middleIntake.setPower(0);
-                outake.setPower(.8);
-                outake2.setPower(.8);
-            }
-
-        }
-        else   {
-
-            outake.setPower(0);
-            outake2.setPower(0);
-            middleIntake.setPower(0);
         }
 
-        if (gamepad1.a){
-            frontIntake.setPower(1);
-            middleIntake.setPower(1);
-            outake.setPower(.9);
-            outake2.setPower(.9);
+        else if (autoTimer.seconds() < 3.05) {
+         MoveRobot(.58,0,0);
+         middleIntake.setPower(0);
+         outake.setPower(0);
+         outake2.setPower(0);
         }
-
-
-        if (gamepad1.left_stick_button){
-            frontIntake.setPower(0);
+        else {
+            MoveRobot(0,0,0);
             middleIntake.setPower(0);
             outake.setPower(0);
             outake2.setPower(0);
         }
 
-
-
-        if (gamepad1.x) {
-            outake.setPower(.9);
-            outake2.setPower(.9);
-        }
 
     }
 
@@ -243,4 +168,50 @@ public class BasicTeleop6780 extends OpMode
     public void stop() {
     }
 
+    private void MoveRobot( double strafe, double forwards, double turn) {
+
+        // double strafe = (xInput * Math.sin(-heading)) - (yInput * Math.cos(-heading));
+        // double forwards = (xInput * Math.cos(-heading)) + (yInput * Math.sin(-heading));
+
+        // Denominator is the largest motor power (absolute value) or 1
+        // This ensures all the powers maintain the same ratio, but only when
+        // at least one is out of the range [-1, 1]
+
+        double turnSpeedFactor = 0.45; // Adjust this value between 0 (no turn) and 1 (full turn)
+        double scaledRx = Math.signum(turn) * turn * turn; // smoother turning
+
+        double denominator = Math.max(Math.abs(forwards) + Math.abs(strafe) + Math.abs(scaledRx), 1);
+
+
+        frontLeftDrive.setPower((forwards + strafe + scaledRx) / denominator * .9);
+        backLeftDrive.setPower((forwards - strafe + scaledRx) / denominator * .9);
+        frontRightDrive.setPower((forwards - strafe - scaledRx) / denominator *.9);
+        backRightDrive.setPower((forwards + strafe - scaledRx) / denominator * .9);
+    }
+
+    private boolean IsFlywheelUpToSpeed (){
+        telemetry.addData("outakespeed", outake.getVelocity() );
+        if (outake.getVelocity() < -1750) {
+            outake.setPower(.8);
+            outake2.setPower(.8);
+
+        }
+        else if (outake.getVelocity() < -1900) {
+            outake.setPower(.6);
+            outake2.setPower(.6);
+
+        }
+        else {
+            outake.setPower(.8);
+            outake2.setPower(.8);
+
+        }
+
+        if (outake.getVelocity() < -1750 && outake.getVelocity() > -1900)
+        {
+           return true;
+        }
+        return false;
+    }
+    
 }
