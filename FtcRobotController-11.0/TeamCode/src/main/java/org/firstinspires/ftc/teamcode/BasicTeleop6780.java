@@ -105,6 +105,7 @@ public class BasicTeleop6780 extends OpMode
         middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
         outake2.setDirection(DcMotorSimple.Direction.REVERSE);
         frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontRightDrive.setDirection(DcMotorSimple.Direction.REVERSE);
 
 
 
@@ -147,8 +148,8 @@ public class BasicTeleop6780 extends OpMode
         // This ensures all the powers maintain the same ratio, but only when
         // at least one is out of the range [-1, 1]
 
-        double turnSpeedFactor = 0.45; // Adjust this value between 0 (no turn) and 1 (full turn)
-        double scaledRx = Math.signum(rx) * rx * rx; // smoother turning
+        double turnSpeedFactor = 0.8; // Adjust this value between 0 (no turn) and 1 (full turn)
+        double scaledRx = rx * turnSpeedFactor; // smoother turning
 
         double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(scaledRx), 1);
 
@@ -170,6 +171,7 @@ public class BasicTeleop6780 extends OpMode
 
         if (gamepad1.y) {
             middleIntake.setPower(-1);
+            frontIntake.setPower(-1);
         }
 
 
@@ -189,14 +191,15 @@ public class BasicTeleop6780 extends OpMode
         telemetry.update();
         if (isOuttakeOn == true) {
 
-            if (outake.getVelocity() < -1750) {
+            if (outake.getVelocity() < -1900) {
+                outake.setPower(.7);
+                outake2.setPower(.7);
+                middleIntake.setPower(0);
+            }
+            else if (outake.getVelocity() < -1700) {
                 outake.setPower(.8);
                 outake2.setPower(.8);
                 middleIntake.setPower(1);
-            }
-            else if (outake.getVelocity() < -1900) {
-                outake.setPower(.6);
-                outake2.setPower(.6);
             }
             else {
                 middleIntake.setPower(0);
@@ -213,10 +216,10 @@ public class BasicTeleop6780 extends OpMode
         }
 
         if (gamepad1.a){
-            frontIntake.setPower(1);
+            outake.setPower(1);
+            outake2.setPower(1);
             middleIntake.setPower(1);
-            outake.setPower(.9);
-            outake2.setPower(.9);
+            frontIntake.setPower(1);
         }
 
 
