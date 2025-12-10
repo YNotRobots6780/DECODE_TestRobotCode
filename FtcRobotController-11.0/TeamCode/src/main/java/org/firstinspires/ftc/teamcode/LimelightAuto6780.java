@@ -29,6 +29,7 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
@@ -68,7 +69,7 @@ public class LimelightAuto6780 extends OpMode
     private DcMotor frontRightDrive = null;
     private DcMotor backRightDrive = null;
     private DcMotor backLeftDrive = null;
-
+    private Limelight3A limelight = null;
 
 
     private ElapsedTime autoTimer = new ElapsedTime();
@@ -89,6 +90,7 @@ public class LimelightAuto6780 extends OpMode
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
         imu = hardwareMap.get(IMU.class, "IMU");
+        limelight = hardwareMap.get(Limelight3A.class, "limelight");
         frontLeftDrive  = hardwareMap.get(DcMotor.class, "front_left_drive");
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
@@ -121,6 +123,9 @@ public class LimelightAuto6780 extends OpMode
      */
     @Override
     public void init_loop() {
+        limelight = hardwareMap.get(Limelight3A.class, "limelight");
+        limelight.setPollRateHz(100); // This sets how often we ask Limelight for data (100 times per second)
+        limelight.start(); // This tells Limelight to start looking!
 
     }
 
@@ -131,6 +136,7 @@ public class LimelightAuto6780 extends OpMode
 
     @Override
     public void loop() {
+        limelight.pipelineSwitch(0); // Switch to pipeline number 0
         timer.Update();
         MoveRobot(0,0,90);
 
