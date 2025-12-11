@@ -38,8 +38,11 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
+import org.firstinspires.ftc.robotcore.external.navigation.Position;
 import org.firstinspires.ftc.teamcode.core.PIDController;
 import org.firstinspires.ftc.teamcode.core.Timer;
 
@@ -71,6 +74,7 @@ public class LimelightAuto6780 extends OpMode
     private DcMotor backRightDrive = null;
     private DcMotor backLeftDrive = null;
     private Limelight3A limelight = null;
+    private Servo lights = null;
 
 
     private ElapsedTime autoTimer = new ElapsedTime();
@@ -92,6 +96,7 @@ public class LimelightAuto6780 extends OpMode
         // step (using the FTC Robot Controller app on the phone).
         imu = hardwareMap.get(IMU.class, "imu");
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
+        lights = hardwareMap.get(Servo.class, "lights");
         frontLeftDrive  = hardwareMap.get(DcMotor.class, "front_left_drive");
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
@@ -141,6 +146,8 @@ public class LimelightAuto6780 extends OpMode
     public void loop() {
         timer.Update();
 
+        lights.setPosition(.277);
+
         LLResult llResult = limelight.getLatestResult();
         double aprilTagRotation = llResult.getTx();
 
@@ -151,6 +158,13 @@ public class LimelightAuto6780 extends OpMode
         telemetry.addData("y: ", llResult.getTy());
 
         MoveRobot(0,0,-imu.getRobotYawPitchRollAngles().getYaw() - aprilTagRotation);
+
+        if (CanShoot(llResult.getBotpose().getPosition())) {
+            lights.setPosition(.500);
+        }
+        else {
+            lights.setPosition(.277);
+        }
 
     }
 
@@ -186,5 +200,21 @@ public class LimelightAuto6780 extends OpMode
         telemetry.addData("currentPower ", turnPower);
         telemetry.addData("timer.deltaTime ", timer.deltaTime);
     }
+
+    private boolean CanShoot (Position robotPosition) {
+
+        double a = robotPosition.z;
+        double b = robotPosition.x;
+        double c = Math.sqrt((a * a) + (b * b));
+
+        if (c > 1.5 && c < 2) {
+            return true;
+        }
+        else {
+            return false;
+        }
+
+    }
+
 
 }
