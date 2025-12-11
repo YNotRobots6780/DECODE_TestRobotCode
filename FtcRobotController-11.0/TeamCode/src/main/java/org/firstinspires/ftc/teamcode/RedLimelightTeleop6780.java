@@ -32,16 +32,14 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.robotcore.external.navigation.Position;
 import org.firstinspires.ftc.teamcode.core.PIDController;
 import org.firstinspires.ftc.teamcode.core.Timer;
@@ -60,26 +58,29 @@ import org.firstinspires.ftc.teamcode.core.Timer;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@Autonomous(name="LimelightAuto6780", group="Iterative OpMode")
+@TeleOp(name="RedLimelightTeleop6780", group="Iterative OpMode")
 
-public class LimelightAuto6780 extends OpMode
+public class RedLimelightTeleop6780 extends OpMode
 {
     // Declare OpMode members.
     private IMU imu = null;
 
     private PIDController pidController;
     private Timer timer;
+    private boolean isFlywheelUpToSpeed = false;
     private DcMotor frontLeftDrive = null;
     private DcMotor frontRightDrive = null;
     private DcMotor backRightDrive = null;
     private DcMotor backLeftDrive = null;
+    private DcMotor frontIntake = null;
+    private DcMotor middleIntake = null;
+    private DcMotorEx outake = null;
+    private DcMotorEx outake2 = null;
     private Limelight3A limelight = null;
     private Servo lights = null;
 
-
-    private ElapsedTime autoTimer = new ElapsedTime();
-
-
+    boolean isAutoAlignPressed = false;
+    boolean isAutoAlignOn = false;
 
     boolean isOuttakeOn = false;
     boolean isOuttakePressed = false;
@@ -91,9 +92,6 @@ public class LimelightAuto6780 extends OpMode
     public void init() {
         telemetry.addData("Status", "Initialized");
 
-        // Initialize the hardware variables. Note that the strings used here as parameters
-        // to 'get' must correspond to the names assigned during the robot configuration
-        // step (using the FTC Robot Controller app on the phone).
         imu = hardwareMap.get(IMU.class, "imu");
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
         lights = hardwareMap.get(Servo.class, "lights");
@@ -101,27 +99,37 @@ public class LimelightAuto6780 extends OpMode
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
         backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
+        frontIntake = hardwareMap.get(DcMotor.class, "front_intake");
+        middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
+
+        outake = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake");
+        outake2 = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake2");
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
         // Note: The settings here assume direct drive on left and right wheels.  Gear Reduction or 90 Deg drives may require direction flips
 
         backLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+        outake.setDirection(DcMotorSimple.Direction.REVERSE);
+        middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
+        outake2.setDirection(DcMotorSimple.Direction.REVERSE);
         frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontRightDrive.setDirection(DcMotorSimple.Direction.REVERSE);
 
 
 
-
-        pidController = new PIDController(0.8, 45, .35, 15, 0);
-        pidController.SetLoop(true, -180,180);
-        timer = new Timer();
+        outake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        outake2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         RevHubOrientationOnRobot revHubOrintation = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.DOWN, RevHubOrientationOnRobot.UsbFacingDirection.RIGHT);
         imu.initialize(new IMU.Parameters(revHubOrintation));
 
+        pidController = new PIDController(0.8, 45, .35, 15, 0);
+        pidController.SetLoop(true, -180,180);
+        timer = new Timer();
         // Tell the driver that initialization is complete.
         telemetry.addData("Status", "Initialized");
-        imu.resetYaw();
+
     }
 
     /*
@@ -130,13 +138,11 @@ public class LimelightAuto6780 extends OpMode
     @Override
     public void init_loop() {
 
-
     }
 
     @Override
     public void start() {
         limelight.setPollRateHz(100); // This sets how often we ask Limelight for data (100 times per second)
-        autoTimer.reset();
         limelight.pipelineSwitch(0); // Switch to pipeline number 0
         limelight.start(); // This tells Limelight to start looking!
     }
@@ -145,23 +151,128 @@ public class LimelightAuto6780 extends OpMode
     public void loop() {
         timer.Update();
 
+        if (gamepad1.left_trigger > .4){
+            if (isAutoAlignPressed == false) {
+                isAutoAlignOn = !isAutoAlignOn;
+                isAutoAlignPressed = true;
+
+            }
+        }
+        else {
+            isAutoAlignPressed = false;
+        }
 
         LLResult llResult = limelight.getLatestResult();
-        double aprilTagRotation = llResult.getTx();
-
-        telemetry.addData("Yaw: ", llResult.getBotpose().getOrientation().getYaw());
-        telemetry.addData("pitch: ", llResult.getBotpose().getOrientation().getPitch());
-        telemetry.addData("roll: ", llResult.getBotpose().getOrientation().getRoll());
-        telemetry.addData("x: ", llResult.getTx());
-        telemetry.addData("y: ", llResult.getTy());
-
-        MoveRobot(0,0,-imu.getRobotYawPitchRollAngles().getYaw() - aprilTagRotation);
 
         if (CanShoot(llResult.getBotpose().getPosition())) {
             lights.setPosition(.500);
         }
         else {
             lights.setPosition(.277);
+        }
+
+
+        //Drive Code
+        double y = -gamepad1.left_stick_y; // Remember, Y stick is reversed!
+        double x = gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
+        double rx;
+        if (isAutoAlignOn == false) {
+            rx = gamepad1.right_stick_x;
+        }
+        else {
+            rx = GetAAPower(llResult);
+        }
+
+
+
+
+        double turnSpeedFactor = 0.8; // Adjust this value between 0 (no turn) and 1 (full turn)
+        double scaledRx = rx * turnSpeedFactor; // smoother turning
+
+        double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(scaledRx), 1);
+
+
+        frontLeftDrive.setPower((y + x + scaledRx) / denominator * .9);
+        backLeftDrive.setPower((y - x + scaledRx) / denominator * .9);
+        frontRightDrive.setPower((y - x - scaledRx) / denominator *.9);
+        backRightDrive.setPower((y + x - scaledRx) / denominator * .9);
+
+
+        // Buttons for intaking, shooting, and outtaking.
+        if (gamepad1.right_bumper)   {
+            frontIntake.setPower(1);
+        }
+        else {
+            frontIntake.setPower(0);
+        }
+
+
+        if (gamepad1.y) {
+            middleIntake.setPower(-1);
+            frontIntake.setPower(-1);
+        }
+
+
+        if (gamepad1.right_trigger > 0.3){
+            if (isOuttakePressed == false) {
+                isOuttakeOn = !isOuttakeOn;
+                isOuttakePressed = true;
+
+            }
+        }
+        else {
+            isOuttakePressed = false;
+        }
+
+
+        telemetry.addData( "Outake velocity", outake.getVelocity());
+        telemetry.update();
+        if (isOuttakeOn == true) {
+
+            if (outake.getVelocity() < -1900) {
+                outake.setPower(.7);
+                outake2.setPower(.7);
+                middleIntake.setPower(0);
+            }
+            else if (outake.getVelocity() < -1700) {
+                outake.setPower(.8);
+                outake2.setPower(.8);
+                middleIntake.setPower(1);
+            }
+            else {
+                middleIntake.setPower(0);
+                outake.setPower(.8);
+                outake2.setPower(.8);
+            }
+
+        }
+        else   {
+
+            outake.setPower(0);
+            outake2.setPower(0);
+            middleIntake.setPower(0);
+        }
+
+        if (gamepad1.a){
+            outake.setPower(1);
+            outake2.setPower(1);
+            middleIntake.setPower(1);
+            frontIntake.setPower(1);
+        }
+
+
+        if (gamepad1.left_stick_button){
+            frontIntake.setPower(0);
+            middleIntake.setPower(0);
+            outake.setPower(0);
+            outake2.setPower(0);
+        }
+
+
+
+        if (gamepad1.x) {
+            outake.setPower(.9);
+            outake2.setPower(.9);
         }
 
     }
@@ -173,30 +284,13 @@ public class LimelightAuto6780 extends OpMode
     public void stop() {
     }
 
-    private void MoveRobot( double strafe, double forwards, double targetHeading) {
+    private double GetAAPower(LLResult llResult) {
+        double aprilTagRotation = llResult.getTx();// Basically this tell the robot hey you are X amount of degrees off from facing the goal.
+        double targetHeading = -imu.getRobotYawPitchRollAngles().getYaw() - aprilTagRotation;// this is the actual thing that tells you hey this is how many degrees it needs to turn. (Math)
 
-        // double strafe = (xInput * Math.sin(-heading)) - (yInput * Math.cos(-heading));
-        // double forwards = (xInput * Math.cos(-heading)) + (yInput * Math.sin(-heading));
-
-        // Denominator is the largest motor power (absolute value) or 1
-        // This ensures all the powers maintain the same ratio, but only when
-        // at least one is out of the range [-1, 1]
-
-        double turnPower = pidController.Calculate(-imu.getRobotYawPitchRollAngles().getYaw(), targetHeading, timer.deltaTime) / 45;
-
-        double denominator = Math.max(Math.abs(forwards) + Math.abs(strafe) + Math.abs(turnPower), 1);
-
-
-
-        frontLeftDrive.setPower((forwards + strafe + turnPower) / denominator * .9);
-        backLeftDrive.setPower((forwards - strafe + turnPower) / denominator * .9);
-        frontRightDrive.setPower((forwards - strafe - turnPower) / denominator *.9);
-        backRightDrive.setPower((forwards + strafe - turnPower) / denominator * .9);
-
-        telemetry.addData("currentHeading ", imu.getRobotYawPitchRollAngles().getYaw());
-        telemetry.addData("targetHeading ", targetHeading);
-        telemetry.addData("currentPower ", turnPower);
-        telemetry.addData("timer.deltaTime ", timer.deltaTime);
+        double turnPower = pidController.Calculate(-imu.getRobotYawPitchRollAngles().getYaw(), targetHeading, timer.deltaTime) / 45;// this tells the robot how much power it needs to move it to the proper degrees
+        
+        return turnPower;
     }
 
     private boolean CanShoot (Position robotPosition) {
@@ -213,6 +307,9 @@ public class LimelightAuto6780 extends OpMode
         }
 
     }
+
+
+
 
 
 }
