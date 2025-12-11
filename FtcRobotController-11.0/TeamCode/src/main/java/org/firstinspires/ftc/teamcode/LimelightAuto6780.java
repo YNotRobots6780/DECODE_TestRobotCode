@@ -29,6 +29,7 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
@@ -89,7 +90,7 @@ public class LimelightAuto6780 extends OpMode
         // Initialize the hardware variables. Note that the strings used here as parameters
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
-        imu = hardwareMap.get(IMU.class, "IMU");
+        imu = hardwareMap.get(IMU.class, "imu");
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
         frontLeftDrive  = hardwareMap.get(DcMotor.class, "front_left_drive");
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
@@ -106,8 +107,8 @@ public class LimelightAuto6780 extends OpMode
 
 
 
-        pidController = new PIDController(0.8, 90, 0, 0);
-        // pidController.SetLoop(true,0,360);
+        pidController = new PIDController(0.8, 45, .35, 15, 0);
+        pidController.SetLoop(true, -180,180);
         timer = new Timer();
 
         RevHubOrientationOnRobot revHubOrintation = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.DOWN, RevHubOrientationOnRobot.UsbFacingDirection.RIGHT);
@@ -125,23 +126,31 @@ public class LimelightAuto6780 extends OpMode
     public void init_loop() {
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
         limelight.setPollRateHz(100); // This sets how often we ask Limelight for data (100 times per second)
-        limelight.start(); // This tells Limelight to start looking!
+
 
     }
 
     @Override
     public void start() {
         autoTimer.reset();
+        limelight.pipelineSwitch(0); // Switch to pipeline number 0
+        limelight.start(); // This tells Limelight to start looking!
     }
 
     @Override
     public void loop() {
-        limelight.pipelineSwitch(0); // Switch to pipeline number 0
         timer.Update();
-        MoveRobot(0,0,90);
 
+        LLResult llResult = limelight.getLatestResult();
+        double aprilTagRotation = llResult.getTx();
 
+        telemetry.addData("Yaw: ", llResult.getBotpose().getOrientation().getYaw());
+        telemetry.addData("pitch: ", llResult.getBotpose().getOrientation().getPitch());
+        telemetry.addData("roll: ", llResult.getBotpose().getOrientation().getRoll());
+        telemetry.addData("x: ", llResult.getTx());
+        telemetry.addData("y: ", llResult.getTy());
 
+        MoveRobot(0,0,-imu.getRobotYawPitchRollAngles().getYaw() - aprilTagRotation);
 
     }
 
@@ -161,7 +170,7 @@ public class LimelightAuto6780 extends OpMode
         // This ensures all the powers maintain the same ratio, but only when
         // at least one is out of the range [-1, 1]
 
-        double turnPower = pidController.Calculate(imu.getRobotYawPitchRollAngles().getYaw(), targetHeading, timer.deltaTime) / 90;
+        double turnPower = pidController.Calculate(-imu.getRobotYawPitchRollAngles().getYaw(), targetHeading, timer.deltaTime) / 45;
 
         double denominator = Math.max(Math.abs(forwards) + Math.abs(strafe) + Math.abs(turnPower), 1);
 
