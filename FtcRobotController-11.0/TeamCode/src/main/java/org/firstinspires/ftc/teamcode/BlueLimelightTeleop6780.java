@@ -58,9 +58,9 @@ import org.firstinspires.ftc.teamcode.core.Timer;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@TeleOp(name="RedLimelightTeleop6780", group="Iterative OpMode")
+@TeleOp(name="BlueLimelightTeleop6780", group="Iterative OpMode")
 
-public class RedLimelightTeleop6780 extends OpMode
+public class BlueLimelightTeleop6780 extends OpMode
 {
     // Declare OpMode members.
     private IMU imu = null;
@@ -143,7 +143,7 @@ public class RedLimelightTeleop6780 extends OpMode
     @Override
     public void start() {
         limelight.setPollRateHz(100); // This sets how often we ask Limelight for data (100 times per second)
-        limelight.pipelineSwitch(0); // Switch to pipeline number 0
+        limelight.pipelineSwitch(1); // Switch to pipeline number 0
         limelight.start(); // This tells Limelight to start looking!
     }
 
@@ -165,10 +165,10 @@ public class RedLimelightTeleop6780 extends OpMode
         LLResult llResult = limelight.getLatestResult();
 
         if (CanShoot(llResult.getBotpose().getPosition())) {
-            lights.setPosition(.500);
+            lights.setPosition(.611);
         }
         else {
-            lights.setPosition(.3);
+            lights.setPosition(.611);
         }
 
 
