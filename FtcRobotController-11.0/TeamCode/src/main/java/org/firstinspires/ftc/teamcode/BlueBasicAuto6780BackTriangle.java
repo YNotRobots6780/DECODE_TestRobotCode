@@ -52,9 +52,9 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@Autonomous(name="Basic Auto 6780", group="Iterative OpMode")
+@Autonomous(name="BlueBasicAuto6780BackTriangle", group="Iterative OpMode")
 
-public class BasicAuto6780 extends OpMode
+public class BlueBasicAuto6780BackTriangle extends OpMode
 {
     // Declare OpMode members.
     private IMU imu = null;
@@ -105,6 +105,7 @@ public class BasicAuto6780 extends OpMode
         middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
         outake2.setDirection(DcMotorSimple.Direction.REVERSE);
         frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontRightDrive.setDirection(DcMotorSimple.Direction.REVERSE);
 
 
 
@@ -135,21 +136,9 @@ public class BasicAuto6780 extends OpMode
 
     @Override
     public void loop() {
-        if (autoTimer.seconds() < .52){
-            MoveRobot(0,-0.9,0);
+        if (autoTimer.seconds() > 1){
+            MoveRobot(-1,0,0);
         }
-        else if (autoTimer.seconds() < 2.72) {
-            MoveRobot(0,0,0);
-            if (IsFlywheelUpToSpeed() == true){
-                middleIntake.setPower(1);
-            }
-        }
-
-        else if (autoTimer.seconds() < 3.20) {
-            MoveRobot(-.58,0,0);
-            middleIntake.setPower(0);
-            outake.setPower(0);
-            outake2.setPower(0);}
         else {
             MoveRobot(0,0,0);
         }

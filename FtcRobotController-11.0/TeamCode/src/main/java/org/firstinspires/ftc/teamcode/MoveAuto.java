@@ -31,7 +31,8 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
@@ -39,24 +40,28 @@ import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /*
- * This file contains an example of an iterative (Non-Linear) "OpMode".
- * An OpMode is a 'program' that runs in either the autonomous or the teleop period of an FTC match.
- * The names of OpModes appear on the menu of the FTC Driver Station.
- * When a selection is made from the menu, the corresponding OpMode
- * class is instantiated on the Robot Controller and executed.
+ * This OpMode illustrates the concept of driving a path based on time.
+ * The code is structured as a LinearOpMode
  *
- * This particular OpMode just executes a basic Tank Drive Teleop for a two wheeled robot
- * It includes all the skeletal structure that all iterative OpModes contain.
+ * The code assumes that you do NOT have encoders on the wheels,
+ *   otherwise you would use: RobotAutoDriveByEncoder;
+ *
+ *   The desired path in this example is:
+ *   - Drive forward for 3 seconds
+ *   - Spin right for 1.3 seconds
+ *   - Drive Backward for 1 Second
+ *
+ *  The code is written in a simple form with no optimizations.
+ *  However, there are several ways that this type of sequence could be streamlined,
  *
  * Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@Autonomous(name="BasicAuto6780BackTriangle", group="Iterative OpMode")
+@Autonomous(name="Move Auto", group="Robot")
+//@Disabled
+public class MoveAuto extends LinearOpMode {
 
-public class BasicAuto6780BackTriangle extends OpMode
-{
-    // Declare OpMode members.
     private IMU imu = null;
     private boolean isFlywheelUpToSpeed = false;
     private DcMotor frontLeftDrive = null;
@@ -68,18 +73,25 @@ public class BasicAuto6780BackTriangle extends OpMode
     private DcMotorEx outake = null;
 
     private DcMotorEx outake2 = null;
-    private ElapsedTime autoTimer = new ElapsedTime();
 
+    private ElapsedTime     runtime = new ElapsedTime();
 
+    double y = 0; // Remember, Y stick is reversed!
+    double x = 0; // Counteract imperfect strafing
+    double rx = 0;
+
+    double turnSpeedFactor = 0.8; // Adjust this value between 0 (no turn) and 1 (full turn)
+    double scaledRx = rx * turnSpeedFactor; // smoother turning
+
+    double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(scaledRx), 1);
 
     boolean isOuttakeOn = false;
     boolean isOuttakePressed = false;
 
-    /*
-     * Code to run ONCE when the driver hits INIT
-     */
     @Override
-    public void init() {
+    public void runOpMode() {
+
+        // Initialize the drive system variables.
         telemetry.addData("Status", "Initialized");
 
         // Initialize the hardware variables. Note that the strings used here as parameters
@@ -90,22 +102,18 @@ public class BasicAuto6780BackTriangle extends OpMode
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
         backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
-        frontIntake = hardwareMap.get(DcMotor.class, "front_intake");
+        frontIntake = hardwareMap.get(DcMotor.class, "frontintake");
         middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
 
         outake = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake");
         outake2 = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake2");
 
-        // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
-        // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
-        // Note: The settings here assume direct drive on left and right wheels.  Gear Reduction or 90 Deg drives may require direction flips
-
         backLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
         outake.setDirection(DcMotorSimple.Direction.REVERSE);
         middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
-        outake2.setDirection(DcMotorSimple.Direction.REVERSE);
+        //outake2.setDirection(DcMotorSimple.Direction.REVERSE);
         frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
-
+        frontRightDrive.setDirection(DcMotorSimple.Direction.REVERSE);
 
 
 
@@ -118,86 +126,44 @@ public class BasicAuto6780BackTriangle extends OpMode
         // Tell the driver that initialization is complete.
         telemetry.addData("Status", "Initialized");
         imu.resetYaw();
-    }
 
-    /*
-     * Code to run REPEATEDLY after the driver hits INIT, but before they hit START
-     */
-    @Override
-    public void init_loop() {
-
-    }
-
-    @Override
-    public void start() {
-        autoTimer.reset();
-    }
-
-    @Override
-    public void loop() {
-        if (autoTimer.seconds() < .35){
-            MoveRobot(-1,0,0);
-        }
-        else {
-            MoveRobot(0,0,0);
-        }
+        // Wait for the game to start (driver presses START)
+        waitForStart();
 
 
 
 
-    }
-
-    /*
-     * Code to run ONCE after the driver hits STOP
-     */
-    @Override
-    public void stop() {
-    }
-
-    private void MoveRobot( double strafe, double forwards, double turn) {
-
-        // double strafe = (xInput * Math.sin(-heading)) - (yInput * Math.cos(-heading));
-        // double forwards = (xInput * Math.cos(-heading)) + (yInput * Math.sin(-heading));
+        // double x = (xInput * Math.sin(-heading)) - (yInput * Math.cos(-heading));
+        // double y = (xInput * Math.cos(-heading)) + (yInput * Math.sin(-heading));
 
         // Denominator is the largest motor power (absolute value) or 1
         // This ensures all the powers maintain the same ratio, but only when
         // at least one is out of the range [-1, 1]
 
-        double turnSpeedFactor = 0.45; // Adjust this value between 0 (no turn) and 1 (full turn)
-        double scaledRx = Math.signum(turn) * turn * turn; // smoother turning
+        frontLeftDrive.setPower((y + x + scaledRx) / denominator * .9);
+        backLeftDrive.setPower((y - x + scaledRx) / denominator * .9);
+        frontRightDrive.setPower((y - x - scaledRx) / denominator *.9);
+        backRightDrive.setPower((y + x - scaledRx) / denominator * .9);
 
-        double denominator = Math.max(Math.abs(forwards) + Math.abs(strafe) + Math.abs(scaledRx), 1);
+        // Step 1:  Drive forward for 3 seconds
+
+        runtime.reset();
+        while (opModeIsActive() && (runtime.seconds() < 0.5)) {
+            y= -0.5;
+
+        }
+
+        runtime.reset();
+        while (opModeIsActive() && (runtime.seconds() < 30)) {
+            y= 0;
+
+        }
 
 
-        frontLeftDrive.setPower((forwards + strafe + scaledRx) / denominator * .9);
-        backLeftDrive.setPower((forwards - strafe + scaledRx) / denominator * .9);
-        frontRightDrive.setPower((forwards - strafe - scaledRx) / denominator *.9);
-        backRightDrive.setPower((forwards + strafe - scaledRx) / denominator * .9);
+        }
+
+
+
+
     }
 
-    private boolean IsFlywheelUpToSpeed (){
-        telemetry.addData("outakespeed", outake.getVelocity() );
-        if (outake.getVelocity() < -1750) {
-            outake.setPower(.8);
-            outake2.setPower(.8);
-
-        }
-        else if (outake.getVelocity() < -1900) {
-            outake.setPower(.6);
-            outake2.setPower(.6);
-
-        }
-        else {
-            outake.setPower(.8);
-            outake2.setPower(.8);
-
-        }
-
-        if (outake.getVelocity() < -1750 && outake.getVelocity() > -1900)
-        {
-            return true;
-        }
-        return false;
-    }
-
-}

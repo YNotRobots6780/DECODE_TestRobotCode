@@ -37,8 +37,11 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
+
+import org.firstinspires.ftc.teamcode.core.Timer;
 
 /*
  * This file contains an example of an iterative (Non-Linear) "OpMode".
@@ -58,18 +61,23 @@ import com.qualcomm.robotcore.util.Range;
 
 public class BasicTeleop6780 extends OpMode
 {
-    // Declare OpMode members.
+    //Declare OpMode members.
     private IMU imu = null;
-    private boolean isFlywheelUpToSpeed = false;
+   private boolean isFlywheelUpToSpeed = false;
     private DcMotor frontLeftDrive = null;
     private DcMotor frontRightDrive = null;
     private DcMotor backRightDrive = null;
     private DcMotor backLeftDrive = null;
     private DcMotor frontIntake = null;
-    private DcMotor middleIntake = null;
-    private DcMotorEx outake = null;
+   private DcMotor middleIntake = null;
+   private DcMotorEx outake = null;
+   private Servo ballStopper = null;
+    private Servo hood = null;
 
-    private DcMotorEx outake2 = null;
+    private Timer shootTimer;
+    boolean isUpToSpeed;
+
+
 
 
     boolean isOuttakeOn = false;
@@ -86,31 +94,32 @@ public class BasicTeleop6780 extends OpMode
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
         imu = hardwareMap.get(IMU.class, "imu");
+        ballStopper = hardwareMap.get(Servo.class, "ballStopper");
+        hood = hardwareMap.get(Servo.class, "hood");
         frontLeftDrive  = hardwareMap.get(DcMotor.class, "front_left_drive");
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
         backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
-        frontIntake = hardwareMap.get(DcMotor.class, "front_intake");
+        frontIntake = hardwareMap.get(DcMotor.class, "frontintake");
         middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
 
         outake = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake");
-        outake2 = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake2");
+        shootTimer = new Timer();
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
         // Note: The settings here assume direct drive on left and right wheels.  Gear Reduction or 90 Deg drives may require direction flips
 
         backLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
-        outake.setDirection(DcMotorSimple.Direction.REVERSE);
         middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
-        outake2.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontIntake.setDirection(DcMotorSimple.Direction.REVERSE);
         frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
         frontRightDrive.setDirection(DcMotorSimple.Direction.REVERSE);
 
 
 
         outake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        outake2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
 
         RevHubOrientationOnRobot revHubOrintation = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.DOWN, RevHubOrientationOnRobot.UsbFacingDirection.RIGHT);
         imu.initialize(new IMU.Parameters(revHubOrintation));
@@ -136,6 +145,7 @@ public class BasicTeleop6780 extends OpMode
     public void loop() {
         // double heading = imu.getRobotYawPitchRollAngles().getYaw();
 
+        shootTimer.Update ();
         double y = -gamepad1.left_stick_y; // Remember, Y stick is reversed!
         double x = gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
         double rx = gamepad1.right_stick_x;
@@ -161,17 +171,18 @@ public class BasicTeleop6780 extends OpMode
 
 
 
-        if (gamepad1.left_bumper)   {
-            frontIntake.setPower(1);
-        }
-        else {
-            frontIntake.setPower(0);
-        }
+
+
 
 
         if (gamepad1.y) {
             middleIntake.setPower(-1);
             frontIntake.setPower(-1);
+            ballStopper.setPosition(.96);
+        }
+        else {
+            middleIntake.setPower(0);
+            frontIntake.setPower(0);
         }
 
 
@@ -179,7 +190,6 @@ public class BasicTeleop6780 extends OpMode
             if (isOuttakePressed == false) {
                 isOuttakeOn = !isOuttakeOn;
                 isOuttakePressed = true;
-
             }
         }
         else {
@@ -191,51 +201,66 @@ public class BasicTeleop6780 extends OpMode
         telemetry.update();
         if (isOuttakeOn == true) {
 
-            if (outake.getVelocity() < -1900) {
-                outake.setPower(.7);
-                outake2.setPower(.7);
+            if (outake.getVelocity() < 1600) {
+                outake.setPower(1);
                 middleIntake.setPower(0);
-            }
-            else if (outake.getVelocity() < -1700) {
-                outake.setPower(.8);
-                outake2.setPower(.8);
-                middleIntake.setPower(1);
+                frontIntake.setPower(0);
+                ballStopper.setPosition(.96);
+                isUpToSpeed = false;
             }
             else {
-                middleIntake.setPower(0);
+                if (isUpToSpeed == false){
+                    shootTimer.Reset();
+                    isUpToSpeed = true;
+                }
                 outake.setPower(.8);
-                outake2.setPower(.8);
+                ballStopper.setPosition(1);
+                if (shootTimer.timeSinceStart > 0.5) {
+                    middleIntake.setPower(1);
+                    frontIntake.setPower(1);
+                }
             }
 
         }
+
         else   {
 
             outake.setPower(0);
-            outake2.setPower(0);
             middleIntake.setPower(0);
+            frontIntake.setPower(0);
+            ballStopper.setPosition(0.96);
         }
 
-        if (gamepad1.a){
-            outake.setPower(1);
-            outake2.setPower(1);
+
+
+
+        if (gamepad1.right_bumper){
             middleIntake.setPower(1);
             frontIntake.setPower(1);
         }
+        else {
+            middleIntake.setPower(0);
+            frontIntake.setPower(0);
+        }
+
+
+        if (gamepad1.x){
+         ballStopper.setPosition(1);
+        }
+
+
 
 
         if (gamepad1.left_stick_button){
             frontIntake.setPower(0);
             middleIntake.setPower(0);
             outake.setPower(0);
-            outake2.setPower(0);
         }
 
 
 
-        if (gamepad1.x) {
-            outake.setPower(.9);
-            outake2.setPower(.9);
-        }
+
+
 
     }
 
