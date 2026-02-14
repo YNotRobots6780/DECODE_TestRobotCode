@@ -30,14 +30,16 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.teamcode.core.Timer;
 
@@ -55,11 +57,11 @@ import org.firstinspires.ftc.teamcode.core.Timer;
  * Remove or comment out the @Disabled line to add this OpMode to the Driver Station OpMode list
  */
 
-@Autonomous(name="BlueBasicAuto6780BackTriangle", group="Iterative OpMode")
+@TeleOp(name="test", group="Iterative OpMode")
 
-public class BlueBasicAuto6780BackTriangle extends OpMode
+public class test extends OpMode
 {
-    // Declare OpMode members.
+    //Declare OpMode members.
     private IMU imu = null;
     private boolean isFlywheelUpToSpeed = false;
     private DcMotor frontLeftDrive = null;
@@ -69,9 +71,13 @@ public class BlueBasicAuto6780BackTriangle extends OpMode
     private DcMotor frontIntake = null;
     private DcMotor middleIntake = null;
     private DcMotorEx outake = null;
+    private DcMotorEx outtake2 = null;
     private Servo ballStopper = null;
     private Servo hood = null;
-    private ElapsedTime autoTimer = new ElapsedTime();
+
+    private Timer shootTimer;
+    boolean isUpToSpeed;
+
 
 
 
@@ -91,14 +97,16 @@ public class BlueBasicAuto6780BackTriangle extends OpMode
         imu = hardwareMap.get(IMU.class, "imu");
         ballStopper = hardwareMap.get(Servo.class, "ballStopper");
         hood = hardwareMap.get(Servo.class, "hood");
-        frontLeftDrive  = hardwareMap.get(DcMotor.class, "front_left_drive");
-        backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
-        frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
-        backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
+        frontLeftDrive  = hardwareMap.get(DcMotor.class, "fl");
+        backLeftDrive = hardwareMap.get(DcMotor.class, "bl");
+        frontRightDrive = hardwareMap.get(DcMotor.class, "fr");
+        backRightDrive = hardwareMap.get(DcMotor.class, "br");
         frontIntake = hardwareMap.get(DcMotor.class, "frontintake");
         middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
 
         outake = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake");
+        outtake2 = (DcMotorEx) hardwareMap.get(DcMotor.class, "ottake2");
+        shootTimer = new Timer();
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
@@ -108,11 +116,13 @@ public class BlueBasicAuto6780BackTriangle extends OpMode
         middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
         frontIntake.setDirection(DcMotorSimple.Direction.REVERSE);
         frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
-        frontRightDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontRightDrive.setDirection(DcMotorSimple.Direction.FORWARD);
+        outtake2.setDirection(DcMotorSimple.Direction.REVERSE);
 
 
 
         outake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        outtake2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
 
         RevHubOrientationOnRobot revHubOrintation = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.DOWN, RevHubOrientationOnRobot.UsbFacingDirection.RIGHT);
@@ -133,21 +143,40 @@ public class BlueBasicAuto6780BackTriangle extends OpMode
 
     @Override
     public void start() {
-        autoTimer.reset();
     }
 
     @Override
     public void loop() {
-        if (autoTimer.seconds() > 28){
-            MoveRobot(-1,0,0);
-        } else if (autoTimer.seconds() > 28.5) {
-            MoveRobot(0,0,0);
-        }
-         else {
-            MoveRobot(0,0,0);
-        }
+        // double heading = imu.getRobotYawPitchRollAngles().getYaw();
+
+        shootTimer.Update();
+        double y = -gamepad1.left_stick_y; // Remember, Y stick is reversed!
+        double x = gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
+        double rx = gamepad1.right_stick_x;
 
 
+        // double x = (xInput * Math.sin(-heading)) - (yInput * Math.cos(-heading));
+        // double y = (xInput * Math.cos(-heading)) + (yInput * Math.sin(-heading));
+
+        // Denominator is the largest motor power (absolute value) or 1
+        // This ensures all the powers maintain the same ratio, but only when
+        // at least one is out of the range [-1, 1]
+
+        double turnSpeedFactor = 0.8; // Adjust this value between 0 (no turn) and 1 (full turn)
+        double scaledRx = rx * turnSpeedFactor; // smoother turning
+
+        double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(scaledRx), 1);
+
+
+        frontLeftDrive.setPower((y + x + scaledRx) / denominator * .9);
+        backLeftDrive.setPower((y - x + scaledRx) / denominator * .9);
+        frontRightDrive.setPower((y - x - scaledRx) / denominator * .9);
+        backRightDrive.setPower((y + x - scaledRx) / denominator * .9);
+
+        if (gamepad1.y){
+            outake.setPower(1);
+            outtake2.setPower(1);
+        }
 
 
     }
@@ -157,49 +186,6 @@ public class BlueBasicAuto6780BackTriangle extends OpMode
      */
     @Override
     public void stop() {
-    }
-
-    private void MoveRobot( double strafe, double forwards, double turn) {
-
-        // double strafe = (xInput * Math.sin(-heading)) - (yInput * Math.cos(-heading));
-        // double forwards = (xInput * Math.cos(-heading)) + (yInput * Math.sin(-heading));
-
-        // Denominator is the largest motor power (absolute value) or 1
-        // This ensures all the powers maintain the same ratio, but only when
-        // at least one is out of the range [-1, 1]
-
-        double turnSpeedFactor = 0.45; // Adjust this value between 0 (no turn) and 1 (full turn)
-        double scaledRx = Math.signum(turn) * turn * turn; // smoother turning
-
-        double denominator = Math.max(Math.abs(forwards) + Math.abs(strafe) + Math.abs(scaledRx), 1);
-
-
-        frontLeftDrive.setPower((forwards + strafe + scaledRx) / denominator * .9);
-        backLeftDrive.setPower((forwards - strafe + scaledRx) / denominator * .9);
-        frontRightDrive.setPower((forwards - strafe - scaledRx) / denominator *.9);
-        backRightDrive.setPower((forwards + strafe - scaledRx) / denominator * .9);
-    }
-
-    private boolean IsFlywheelUpToSpeed (){
-        telemetry.addData("outakespeed", outake.getVelocity() );
-        if (outake.getVelocity() < -1750) {
-            outake.setPower(.8);
-
-        }
-        else if (outake.getVelocity() < -1900) {
-            outake.setPower(.6);
-
-        }
-        else {
-            outake.setPower(.8);
-
-        }
-
-        if (outake.getVelocity() < -1750 && outake.getVelocity() > -1900)
-        {
-            return true;
-        }
-        return false;
     }
 
 }

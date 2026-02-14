@@ -90,7 +90,7 @@ public class RedBasicAuto6780BackTriangle extends OpMode
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
         backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
-        frontIntake = hardwareMap.get(DcMotor.class, "front_intake");
+        frontIntake = hardwareMap.get(DcMotor.class, "frontintake");
         middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
 
         outake = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake");
@@ -135,10 +135,11 @@ public class RedBasicAuto6780BackTriangle extends OpMode
 
     @Override
     public void loop() {
-        if (autoTimer.seconds() < 25){
+        if (autoTimer.seconds() > 25){
             MoveRobot(1,0,0);
-        }
-        else {
+        } else if (autoTimer.seconds() < 25.5) {
+            MoveRobot(0,0,0);
+        } else {
             MoveRobot(0,0,0);
         }
 

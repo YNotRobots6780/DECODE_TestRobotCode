@@ -75,15 +75,23 @@ public class BlueLimelightTeleop6780 extends OpMode
     private DcMotor frontIntake = null;
     private DcMotor middleIntake = null;
     private DcMotorEx outake = null;
-    private DcMotorEx outake2 = null;
+    private DcMotorEx outtake2 = null;
+    private Servo ballStopper = null;
+    private Servo hood = null;
+
+    private Timer shootTimer;
+    boolean isUpToSpeed;
+
+
+
+
+    boolean isOuttakeOn = false;
+    boolean isOuttakePressed = false;
     private Limelight3A limelight = null;
-    private Servo lights = null;
 
     boolean isAutoAlignPressed = false;
     boolean isAutoAlignOn = false;
 
-    boolean isOuttakeOn = false;
-    boolean isOuttakePressed = false;
 
     /*
      * Code to run ONCE when the driver hits INIT
@@ -94,37 +102,41 @@ public class BlueLimelightTeleop6780 extends OpMode
 
         imu = hardwareMap.get(IMU.class, "imu");
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
-        lights = hardwareMap.get(Servo.class, "lights");
-        frontLeftDrive  = hardwareMap.get(DcMotor.class, "front_left_drive");
-        backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
-        frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
-        backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
-        frontIntake = hardwareMap.get(DcMotor.class, "front_intake");
+        ballStopper = hardwareMap.get(Servo.class, "ballStopper");
+        hood = hardwareMap.get(Servo.class, "hood");
+        frontLeftDrive  = hardwareMap.get(DcMotor.class, "fl");
+        backLeftDrive = hardwareMap.get(DcMotor.class, "bl");
+        frontRightDrive = hardwareMap.get(DcMotor.class, "fr");
+        backRightDrive = hardwareMap.get(DcMotor.class, "br");
+        frontIntake = hardwareMap.get(DcMotor.class, "frontintake");
         middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
 
         outake = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake");
-        outake2 = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake2");
-
+        outtake2 = (DcMotorEx) hardwareMap.get(DcMotor.class, "ottake2");
+        shootTimer = new Timer();
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
         // Note: The settings here assume direct drive on left and right wheels.  Gear Reduction or 90 Deg drives may require direction flips
 
         backLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
-        outake.setDirection(DcMotorSimple.Direction.REVERSE);
         middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
-        outake2.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontIntake.setDirection(DcMotorSimple.Direction.REVERSE);
         frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
-        frontRightDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontRightDrive.setDirection(DcMotorSimple.Direction.FORWARD);
+        outtake2.setDirection(DcMotorSimple.Direction.REVERSE);
 
 
 
         outake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        outake2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        outtake2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         RevHubOrientationOnRobot revHubOrintation = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.DOWN, RevHubOrientationOnRobot.UsbFacingDirection.RIGHT);
         imu.initialize(new IMU.Parameters(revHubOrintation));
 
-        pidController = new PIDController(0.85, 45, 1, 15, 0);
+        pidController = new PIDController(1, 45, 1, 20, 0);
+        // P= max power it will give the robot, Max error is when it will start slowing down,
+        // KI will get over static friction,
+        // KI active zone is when it will start looking for active zone
         pidController.SetLoop(true, -180,180);
         timer = new Timer();
         // Tell the driver that initialization is complete.
@@ -155,21 +167,16 @@ public class BlueLimelightTeleop6780 extends OpMode
             if (isAutoAlignPressed == false) {
                 isAutoAlignOn = !isAutoAlignOn;
                 isAutoAlignPressed = true;
-
             }
         }
+
         else {
             isAutoAlignPressed = false;
         }
 
+
         LLResult llResult = limelight.getLatestResult();
 
-        if (CanShoot(llResult.getBotpose().getPosition())) {
-            lights.setPosition(.611);
-        }
-        else {
-            lights.setPosition(.300);
-        }
 
 
 
@@ -177,6 +184,7 @@ public class BlueLimelightTeleop6780 extends OpMode
         double y = -gamepad1.left_stick_y; // Remember, Y stick is reversed!
         double x = gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
         double rx;
+
         if (isAutoAlignOn == false) {
             rx = gamepad1.right_stick_x;
         }
@@ -202,9 +210,11 @@ public class BlueLimelightTeleop6780 extends OpMode
         // Buttons for intaking, shooting, and outtaking.
         if (gamepad1.right_bumper)   {
             frontIntake.setPower(1);
+            middleIntake.setPower(1);
         }
         else {
             frontIntake.setPower(0);
+            middleIntake.setPower(0);
         }
 
 
@@ -212,13 +222,16 @@ public class BlueLimelightTeleop6780 extends OpMode
             middleIntake.setPower(-1);
             frontIntake.setPower(-1);
         }
+        else {
+            middleIntake.setPower(0);
+            frontIntake.setPower(0);
+        }
 
 
         if (gamepad1.right_trigger > 0.3){
             if (isOuttakePressed == false) {
                 isOuttakeOn = !isOuttakeOn;
                 isOuttakePressed = true;
-
             }
         }
         else {
@@ -226,54 +239,120 @@ public class BlueLimelightTeleop6780 extends OpMode
         }
 
 
-        telemetry.addData( "Outake velocity", outake.getVelocity());
-        telemetry.update();
         if (isOuttakeOn == true) {
 
-            if (outake.getVelocity() < -1900) {
-                outake.setPower(.7);
-                outake2.setPower(.7);
+            double velocity = outake.getVelocity();
+            telemetry.addData("Outake velocity", velocity);
+
+            // Spin up flywheels until target speed
+            if (velocity < 2200) {
+                outake.setPower(1);
+                outtake2.setPower(1);
                 middleIntake.setPower(0);
+                frontIntake.setPower(0);
             }
-            else if (outake.getVelocity() < -1700) {
-                outake.setPower(.8);
-                outake2.setPower(.8);
+            else if (velocity > 2200){
+                outake.setPower(1);
+                outtake2.setPower(1);
                 middleIntake.setPower(1);
+                frontIntake.setPower(1);
+            }
+        }
+        else {
+            outake.setPower(0);
+            outtake2.setPower(0);
+            middleIntake.setPower(0);
+            frontIntake.setPower(0);
+        }
+
+        //----------Mid triangle shot----------
+        if (gamepad2.left_trigger > .3){
+            hood.setPosition(1);
+            if (isOuttakeOn == true) {
+
+                double velocity = outake.getVelocity();
+                telemetry.addData("Outake velocity", velocity);
+                // Spin up flywheels until target speed
+                if (velocity < 1400) {
+                    outake.setVelocity(1550);
+                    outtake2.setVelocity(1550);
+                    middleIntake.setPower(0);
+                    frontIntake.setPower(0);
+                }
+                else if (velocity > 1600){
+                    outake.setVelocity(1550);
+                    outtake2.setVelocity(1550);
+                    middleIntake.setPower(1);
+                    frontIntake.setPower(1);
+                }
             }
             else {
+                outake.setVelocity(0);
+                outtake2.setVelocity(0);
                 middleIntake.setPower(0);
-                outake.setPower(.8);
-                outake2.setPower(.8);
+                frontIntake.setPower(0);
             }
 
         }
-        else   {
+        //-----------close shot--------
+        else if (gamepad2.right_trigger > .3){
+            hood.setPosition(1);
+            if (isOuttakeOn == true) {
 
-            outake.setPower(0);
-            outake2.setPower(0);
-            middleIntake.setPower(0);
+                double velocity = outake.getVelocity();
+                telemetry.addData("Outake velocity", velocity);
+                hood.setPosition(1);
+                // Spin up flywheels until target speed
+                if (velocity < 1200) {
+                    outake.setVelocity(1250);
+                    outtake2.setVelocity(1250);
+                    middleIntake.setPower(0);
+                    frontIntake.setPower(0);
+                }
+                else if (velocity > 1300){
+                    outake.setVelocity(1250);
+                    outtake2.setVelocity(1150);
+                    middleIntake.setPower(1);
+                    frontIntake.setPower(1);
+                }
+            }
+            else {
+                outake.setVelocity(0);
+                outtake2.setVelocity(0);
+                middleIntake.setPower(0);
+                frontIntake.setPower(0);
+            }
+        }
+         else {
+            hood.setPosition(.9);
         }
 
-        if (gamepad1.a){
-            outake.setPower(1);
-            outake2.setPower(1);
+        if (gamepad1.right_bumper){
             middleIntake.setPower(1);
             frontIntake.setPower(1);
         }
-
+        else {
+            middleIntake.setPower(0);
+            frontIntake.setPower(0);
+        }
+        /*if (gamepad1.a){
+            outake.setPower(1);
+            middleIntake.setPower(1);
+            frontIntake.setPower(1);
+        }
+*/
 
         if (gamepad1.left_stick_button){
             frontIntake.setPower(0);
             middleIntake.setPower(0);
             outake.setPower(0);
-            outake2.setPower(0);
+
         }
 
 
 
         if (gamepad1.x) {
             outake.setPower(.9);
-            outake2.setPower(.9);
         }
 
     }
@@ -287,10 +366,17 @@ public class BlueLimelightTeleop6780 extends OpMode
 
     private double GetAAPower(LLResult llResult) {
         double aprilTagRotation = llResult.getTx();// Basically this tell the robot hey you are X amount of degrees off from facing the goal.
+
+        telemetry.addData("tx: ", aprilTagRotation);
+
         double targetHeading = -imu.getRobotYawPitchRollAngles().getYaw() - aprilTagRotation;// this is the actual thing that tells you hey this is how many degrees it needs to turn. (Math)
 
+        telemetry.addData("targetHeading: ", targetHeading);
+
         double turnPower = pidController.Calculate(-imu.getRobotYawPitchRollAngles().getYaw(), targetHeading, timer.deltaTime) / 45;// this tells the robot how much power it needs to move it to the proper degrees
-        
+
+        telemetry.addData("turnPower: ", turnPower);
+
         return turnPower;
     }
 

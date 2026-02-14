@@ -36,7 +36,10 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.teamcode.core.Timer;
 
 /*
  * This file contains an example of an iterative (Non-Linear) "OpMode".
@@ -66,8 +69,7 @@ public class RedBasicAuto6780 extends OpMode
     private DcMotor frontIntake = null;
     private DcMotor middleIntake = null;
     private DcMotorEx outake = null;
-
-    private DcMotorEx outake2 = null;
+    private Servo hood = null;
     private ElapsedTime autoTimer = new ElapsedTime();
 
 
@@ -86,6 +88,7 @@ public class RedBasicAuto6780 extends OpMode
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
         imu = hardwareMap.get(IMU.class, "imu");
+        hood = hardwareMap.get(Servo.class, "hood");
         frontLeftDrive  = hardwareMap.get(DcMotor.class, "front_left_drive");
         backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
@@ -94,25 +97,21 @@ public class RedBasicAuto6780 extends OpMode
         middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
 
         outake = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake");
-        outake2 = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake2");
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
         // Note: The settings here assume direct drive on left and right wheels.  Gear Reduction or 90 Deg drives may require direction flips
 
         backLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
-        outake.setDirection(DcMotorSimple.Direction.REVERSE);
         middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
-        //outake2.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontIntake.setDirection(DcMotorSimple.Direction.REVERSE);
         frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
         frontRightDrive.setDirection(DcMotorSimple.Direction.REVERSE);
 
 
 
-
-
         outake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        outake2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
 
         RevHubOrientationOnRobot revHubOrintation = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.DOWN, RevHubOrientationOnRobot.UsbFacingDirection.RIGHT);
         imu.initialize(new IMU.Parameters(revHubOrintation));
@@ -138,20 +137,23 @@ public class RedBasicAuto6780 extends OpMode
     @Override
     public void loop() {
         if (autoTimer.seconds() < .52){
-            MoveRobot(0,-0.7,0);
+            MoveRobot(0,0.7,0);
         }
         else if (autoTimer.seconds() < 2.72) {
             MoveRobot(0,0,0);
+
             if (IsFlywheelUpToSpeed() == true){
                 middleIntake.setPower(1);
+                frontIntake.setPower(1);
             }
         }
 
-        else if (autoTimer.seconds() < 3.20) {
-            MoveRobot(0.9,0,0);
+        else if (autoTimer.seconds() < 4) {
+            MoveRobot(-0.9,0,0);
             middleIntake.setPower(0);
             outake.setPower(0);
-            outake2.setPower(0);}
+            frontIntake.setPower(0);
+        }
         else {
             MoveRobot(0,0,0);
         }
@@ -193,17 +195,14 @@ public class RedBasicAuto6780 extends OpMode
         telemetry.addData("outakespeed", outake.getVelocity() );
         if (outake.getVelocity() > 1900) {
             outake.setPower(.6);
-            outake2.setPower(.6);
 
         }
         else if (outake.getVelocity() < 1600) {
             outake.setPower(.9);
-            outake2.setPower(.9);
 
         }
         else {
             outake.setPower(.8);
-            outake2.setPower(.8);
 
         }
 

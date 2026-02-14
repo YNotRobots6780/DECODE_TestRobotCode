@@ -71,6 +71,7 @@ public class BasicTeleop6780 extends OpMode
     private DcMotor frontIntake = null;
    private DcMotor middleIntake = null;
    private DcMotorEx outake = null;
+   private DcMotorEx outtake2 = null;
    private Servo ballStopper = null;
     private Servo hood = null;
 
@@ -96,14 +97,15 @@ public class BasicTeleop6780 extends OpMode
         imu = hardwareMap.get(IMU.class, "imu");
         ballStopper = hardwareMap.get(Servo.class, "ballStopper");
         hood = hardwareMap.get(Servo.class, "hood");
-        frontLeftDrive  = hardwareMap.get(DcMotor.class, "front_left_drive");
-        backLeftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
-        frontRightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
-        backRightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
+        frontLeftDrive  = hardwareMap.get(DcMotor.class, "fl");
+        backLeftDrive = hardwareMap.get(DcMotor.class, "bl");
+        frontRightDrive = hardwareMap.get(DcMotor.class, "fr");
+        backRightDrive = hardwareMap.get(DcMotor.class, "br");
         frontIntake = hardwareMap.get(DcMotor.class, "frontintake");
         middleIntake = hardwareMap.get(DcMotor.class, "middle_intake");
 
         outake = (DcMotorEx) hardwareMap.get(DcMotor.class, "outake");
+        outtake2 = (DcMotorEx) hardwareMap.get(DcMotor.class, "ottake2");
         shootTimer = new Timer();
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
@@ -114,11 +116,13 @@ public class BasicTeleop6780 extends OpMode
         middleIntake.setDirection(DcMotorSimple.Direction.REVERSE);
         frontIntake.setDirection(DcMotorSimple.Direction.REVERSE);
         frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
-        frontRightDrive.setDirection(DcMotorSimple.Direction.REVERSE);
+        frontRightDrive.setDirection(DcMotorSimple.Direction.FORWARD);
+        outtake2.setDirection(DcMotorSimple.Direction.REVERSE);
 
 
 
         outake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        outtake2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
 
         RevHubOrientationOnRobot revHubOrintation = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.DOWN, RevHubOrientationOnRobot.UsbFacingDirection.RIGHT);
@@ -144,6 +148,17 @@ public class BasicTeleop6780 extends OpMode
     @Override
     public void loop() {
         // double heading = imu.getRobotYawPitchRollAngles().getYaw();
+       //the down position is 1
+        if (gamepad1.a){
+            hood.setPosition(.90);
+
+        }
+
+        if (gamepad1.b){
+            hood.setPosition(1);
+        }
+
+
 
         shootTimer.Update ();
         double y = -gamepad1.left_stick_y; // Remember, Y stick is reversed!
@@ -178,7 +193,7 @@ public class BasicTeleop6780 extends OpMode
         if (gamepad1.y) {
             middleIntake.setPower(-1);
             frontIntake.setPower(-1);
-            ballStopper.setPosition(.96);
+            //ballStopper.setPosition(.96);
         }
         else {
             middleIntake.setPower(0);
@@ -197,40 +212,94 @@ public class BasicTeleop6780 extends OpMode
         }
 
 
-        telemetry.addData( "Outake velocity", outake.getVelocity());
-        telemetry.update();
         if (isOuttakeOn == true) {
 
-            if (outake.getVelocity() < 1600) {
+            double velocity = outake.getVelocity();
+            telemetry.addData("Outake velocity", velocity);
+
+            // Spin up flywheels until target speed
+            if (velocity < 2200) {
                 outake.setPower(1);
+                outtake2.setPower(1);
                 middleIntake.setPower(0);
                 frontIntake.setPower(0);
-                ballStopper.setPosition(.96);
-                isUpToSpeed = false;
             }
-            else {
-                if (isUpToSpeed == false){
-                    shootTimer.Reset();
-                    isUpToSpeed = true;
+            else if (velocity > 2200){
+                outake.setPower(1);
+                outtake2.setPower(1);
+                middleIntake.setPower(1);
+                frontIntake.setPower(1);
+            }
+        }
+        else {
+            outake.setPower(0);
+            outtake2.setPower(0);
+            middleIntake.setPower(0);
+            frontIntake.setPower(0);
+        }
+
+        //----------Mid triangle shot----------
+        if (gamepad2.left_trigger > .3){
+            hood.setPosition(1);
+            if (isOuttakeOn == true) {
+
+                double velocity = outake.getVelocity();
+                telemetry.addData("Outake velocity", velocity);
+                // Spin up flywheels until target speed
+                if (velocity < 1400) {
+                    outake.setVelocity(1550);
+                    outtake2.setVelocity(1550);
+                    middleIntake.setPower(0);
+                    frontIntake.setPower(0);
                 }
-                outake.setPower(.8);
-                ballStopper.setPosition(1);
-                if (shootTimer.timeSinceStart > 0.5) {
+                else if (velocity > 1600){
+                    outake.setVelocity(1550);
+                    outtake2.setVelocity(1550);
                     middleIntake.setPower(1);
                     frontIntake.setPower(1);
                 }
             }
+            else {
+                outake.setVelocity(0);
+                outtake2.setVelocity(0);
+                middleIntake.setPower(0);
+                frontIntake.setPower(0);
+            }
 
         }
+        //-----------close shot--------
+        else if (gamepad2.right_trigger > .3){
+            hood.setPosition(1);
+            if (isOuttakeOn == true) {
 
-        else   {
-
-            outake.setPower(0);
-            middleIntake.setPower(0);
-            frontIntake.setPower(0);
-            ballStopper.setPosition(0.96);
+                double velocity = outake.getVelocity();
+                telemetry.addData("Outake velocity", velocity);
+                hood.setPosition(1);
+                // Spin up flywheels until target speed
+                if (velocity < 1200) {
+                    outake.setVelocity(1250);
+                    outtake2.setVelocity(1250);
+                    middleIntake.setPower(0);
+                    frontIntake.setPower(0);
+                }
+                else if (velocity > 1300){
+                    outake.setVelocity(1250);
+                    outtake2.setVelocity(1150);
+                    middleIntake.setPower(1);
+                    frontIntake.setPower(1);
+                }
+            }
+            else {
+                outake.setVelocity(0);
+                outtake2.setVelocity(0);
+                middleIntake.setPower(0);
+                frontIntake.setPower(0);
+            }
         }
 
+        else {
+            hood.setPosition(.9);
+        }
 
 
 
@@ -242,24 +311,6 @@ public class BasicTeleop6780 extends OpMode
             middleIntake.setPower(0);
             frontIntake.setPower(0);
         }
-
-
-        if (gamepad1.x){
-         ballStopper.setPosition(1);
-        }
-
-
-
-
-        if (gamepad1.left_stick_button){
-            frontIntake.setPower(0);
-            middleIntake.setPower(0);
-            outake.setPower(0);
-        }
-
-
-
-
 
 
     }
